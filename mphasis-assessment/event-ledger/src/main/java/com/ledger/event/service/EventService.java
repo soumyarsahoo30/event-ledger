@@ -2,16 +2,21 @@ package com.ledger.event.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ledger.event.dto.BalanceResponse;
 import com.ledger.event.dto.EventRequest;
 import com.ledger.event.dto.EventResponse;
 import com.ledger.event.dto.EventResult;
+import com.ledger.event.exception.EventNotFoundException;
 import com.ledger.event.model.TransactionEvent;
 import com.ledger.event.repo.EventRepository;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class EventService {
@@ -36,6 +41,22 @@ public class EventService {
             return new EventResult(mapToResponse(event), false);
         }
     }
+    public EventResponse getEventById(String eventId) {
+        TransactionEvent event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new EventNotFoundException("EventId "+eventId+" not Found"));
+        return mapToResponse(event);
+    }
+
+    public List<EventResponse> getEventsByAccount(String accountId) {
+        return eventRepository.findByAccountIdOrderByEventTimestampAsc(accountId)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+    public BalanceResponse getBalance(String accountId) {
+        BigDecimal balance = eventRepository.computeBalanceByAccountId(accountId);
+        return new BalanceResponse(accountId, balance);
+    }
 
     private EventResponse mapToResponse(TransactionEvent event) {
         EventResponse response = new EventResponse();
@@ -55,7 +76,6 @@ public class EventService {
         }
         return response;
     }
-
     private TransactionEvent mapToEntity(EventRequest request) {
         TransactionEvent event = new TransactionEvent();
         event.setEventId(request.getEventId());
@@ -74,5 +94,4 @@ public class EventService {
         }
         return event;
     }
-
 }
